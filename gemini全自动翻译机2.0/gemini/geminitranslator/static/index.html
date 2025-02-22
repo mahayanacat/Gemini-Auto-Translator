@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Translator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gemini Translator</h1>
+        <div class="alert alert-info" role="alert" id="statusMessage">
+            请选择文件并设置翻译参数。
+        </div>
+
+        <form id="translationForm">
+            <div class="form-group">
+                <label for="file_path">文件路径:</label>
+                <input type="text" class="form-control" id="file_path" name="file_path" required>
+            </div>
+            <div class="form-group">
+                <label for="style">翻译风格:</label>
+                <input type="text" class="form-control" id="style" name="style" value="正式" required>
+            </div>
+            <div class="form-group">
+                <label for="temperature">Temperature:</label>
+                <input type="number" class="form-control" id="temperature" name="temperature" value="0.7" min="0" max="1" step="0.1" required>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="startBtn">开始翻译</button>
+            <button type="button" class="btn btn-warning" id="pauseBtn">暂停</button>
+            <button type="button" class="btn btn-danger" id="stopBtn">停止</button>
+            <button type="button" class="btn btn-info" id="resumeBtn">继续上次任务</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('translationForm');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Function to fetch and pre-fill last translation parameters
+        async function loadLastTranslationParams() {
+            try {
+                const response = await fetch('/last_translation_params');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                // Pre-fill the form fields
+                document.getElementById('file_path').value = data.file_path || '';
+                document.getElementById('style').value = data.style || '正式';
+                document.getElementById('temperature').value = data.temperature || 0.7;
+
+                // Check for unfinished task on load
+                const resumeResponse = await fetch('/resume', { method: 'POST' });
+                const resumeData = await resumeResponse.json();
+
+                statusMessage.textContent = resumeData.message;
+
+
+            } catch (error) {
+                console.error('Failed to load last translation parameters:', error);
+                statusMessage.textContent = '无法加载上次的翻译参数，请手动填写。';
+            }
+        }
+
+        // Load last translation parameters when the page loads
+        window.onload = loadLastTranslationParams;
+
+        startBtn.addEventListener('click', async () => {
+            const file_path = document.getElementById('file_path').value;
+            const style = document.getElementById('style').value;
+            const temperature = document.getElementById('temperature').value;
+
+            statusMessage.textContent = '翻译任务已启动...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file_path', file_path);
+                formData.append('style', style);
+                formData.append('temperature', temperature);
+
+                const response = await fetch('/start_translation', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                statusMessage.textContent = data.message;
+
+            } catch (error) {
+                console.error('There was an error:', error);
+                statusMessage.textContent = '启动翻译任务失败，请检查网络连接或后端服务。';
+            }
+        });
+
+        pauseBtn.addEventListener('click', async () => {
+            const file_path = document.getElementById('file_path').value;
+            const style = document.getElementById('style').value;
+            const temperature = document.getElementById('temperature').value;
+
+            statusMessage.textContent = '翻译任务已暂停...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file_path', file_path);
+                formData.append('style', style);
+                formData.append('temperature', temperature);
+
+                const response = await fetch('/pause', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                statusMessage.textContent = data.message;
+            } catch (error) {
+                console.error('There was an error:', error);
+                statusMessage.textContent = '暂停翻译任务失败，请检查网络连接或后端服务。';
+            }
+        });
+
+        stopBtn.addEventListener('click', async () => {
+            const file_path = document.getElementById('file_path').value;
+            const style = document.getElementById('style').value;
+            const temperature = document.getElementById('temperature').value;
+
+            statusMessage.textContent = '翻译任务已停止，所有进度将被清除...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file_path', file_path);
+                formData.append('style', style);
+                formData.append('temperature', temperature);
+
+                const response = await fetch('/stop', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                statusMessage.textContent = data.message;
+            } catch (error) {
+                console.error('There was an error:', error);
+                statusMessage.textContent = '停止翻译任务失败，请检查网络连接或后端服务。';
+            }
+        });
+
+        resumeBtn.addEventListener('click', async () => {
+            statusMessage.textContent = '尝试恢复翻译任务...';
+
+            try {
+                const response = await fetch('/resume', {
+                    method: 'POST',
+                });
+
+                const data = await response.json();
+                statusMessage.textContent = data.message;
+
+            } catch (error) {
+                console.error('There was an error:', error);
+                statusMessage.textContent = '恢复翻译任务失败，请检查网络连接或后端服务。';
+            }
+        });
+    </script>
+</body>
+</html>
